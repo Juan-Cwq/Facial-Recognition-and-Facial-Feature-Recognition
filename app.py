@@ -13,13 +13,35 @@ import os
 
 app = Flask(__name__)
 
-# Model paths - will be included in deployment
-MODEL_DIR = os.path.join(os.path.dirname(__file__), 'models')
+# Model URLs - hosted externally to avoid deployment size limits
+MODEL_URL = "https://github.com/opencv/opencv_3rdparty/raw/dnn_samples_face_detector_20170830/res10_300x300_ssd_iter_140000.caffemodel"
+CONFIG_URL = "https://raw.githubusercontent.com/opencv/opencv/master/samples/dnn/face_detector/deploy.prototxt"
+
+# Model paths in /tmp (Vercel's writable directory)
+MODEL_DIR = '/tmp'
 MODEL_PATH = os.path.join(MODEL_DIR, 'res10_300x300_ssd_iter_140000.caffemodel')
 CONFIG_PATH = os.path.join(MODEL_DIR, 'deploy.prototxt')
 
-# Load face detection model
+def download_models():
+    """Download model files if they don't exist"""
+    import urllib.request
+    
+    os.makedirs(MODEL_DIR, exist_ok=True)
+    
+    if not os.path.exists(MODEL_PATH):
+        print("Downloading model file...")
+        urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
+        print("✓ Model downloaded")
+    
+    if not os.path.exists(CONFIG_PATH):
+        print("Downloading config file...")
+        urllib.request.urlretrieve(CONFIG_URL, CONFIG_PATH)
+        print("✓ Config downloaded")
+
+# Download and load face detection model
+net = None
 try:
+    download_models()
     net = cv2.dnn.readNetFromCaffe(CONFIG_PATH, MODEL_PATH)
     print("✓ Face detection model loaded successfully")
 except Exception as e:
