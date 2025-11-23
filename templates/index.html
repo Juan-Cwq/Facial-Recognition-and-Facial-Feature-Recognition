@@ -331,6 +331,12 @@
                         <input type="range" id="pixelSize" min="5" max="30" step="1" value="16">
                         <div class="slider-value" id="pixelValue">16</div>
                     </div>
+
+                    <div class="slider-group">
+                        <label>Update Speed (FPS)</label>
+                        <input type="range" id="frameRate" min="1" max="10" step="1" value="2">
+                        <div class="slider-value" id="frameRateValue">2 FPS</div>
+                    </div>
                 </div>
             </div>
 
@@ -386,6 +392,8 @@
         const thresholdSlider = document.getElementById('threshold');
         const blurSlider = document.getElementById('blurFactor');
         const pixelSlider = document.getElementById('pixelSize');
+        const frameRateSlider = document.getElementById('frameRate');
+        let updateInterval = 500; // milliseconds between updates
 
         // Update slider values
         thresholdSlider.addEventListener('input', (e) => {
@@ -398,6 +406,12 @@
 
         pixelSlider.addEventListener('input', (e) => {
             document.getElementById('pixelValue').textContent = e.target.value;
+        });
+
+        frameRateSlider.addEventListener('input', (e) => {
+            const fps = parseInt(e.target.value);
+            updateInterval = 1000 / fps;
+            document.getElementById('frameRateValue').textContent = fps + ' FPS';
         });
 
         // Start camera
@@ -478,18 +492,24 @@
         async function processVideoFrame() {
             if (!stream) return;
             
-            // Process frame every 100ms for real-time feel
+            // Use the user-adjustable update interval
             await captureAndProcess();
-            animationId = setTimeout(() => processVideoFrame(), 100);
+            animationId = setTimeout(() => processVideoFrame(), updateInterval);
         }
 
         async function captureAndProcess() {
             if (isProcessing) return;
             
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0);
-            const imageData = canvas.toDataURL('image/jpeg');
+            // Reduce resolution for faster processing
+            const maxWidth = 640;
+            const scale = maxWidth / video.videoWidth;
+            
+            canvas.width = maxWidth;
+            canvas.height = video.videoHeight * scale;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            // Use lower quality for faster upload
+            const imageData = canvas.toDataURL('image/jpeg', 0.7);
             await processImage(imageData);
         }
 

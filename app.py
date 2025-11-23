@@ -67,9 +67,27 @@ def detect_faces():
         pixel_size = int(data.get('pixel_size', 16))
         
         # Decode base64 image
-        image_bytes = base64.b64decode(image_data.split(',')[1])
-        image = Image.open(io.BytesIO(image_bytes))
-        img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+        if ',' in image_data:
+            image_bytes = base64.b64decode(image_data.split(',')[1])
+        else:
+            image_bytes = base64.b64decode(image_data)
+        
+        # Convert to numpy array directly (faster than PIL)
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        
+        if img is None:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to decode image'
+            }), 400
+        
+        # Resize for faster processing (optional - improves speed)
+        max_width = 1280
+        height, width = img.shape[:2]
+        if width > max_width:
+            scale = max_width / width
+            img = cv2.resize(img, (int(width * scale), int(height * scale)))
         
         # Detect faces
         faces = detect_faces_in_image(img, threshold)
@@ -77,12 +95,9 @@ def detect_faces():
         # Apply privacy filter
         processed = apply_privacy_filter(img, faces, privacy_mode, blur_factor, pixel_size)
         
-        # Convert back to base64
-        processed_rgb = cv2.cvtColor(processed, cv2.COLOR_BGR2RGB)
-        pil_img = Image.fromarray(processed_rgb)
-        buffer = io.BytesIO()
-        pil_img.save(buffer, format='JPEG', quality=95)
-        processed_base64 = base64.b64encode(buffer.getvalue()).decode()
+        # Convert back to base64 (faster encoding)
+        _, buffer = cv2.imencode('.jpg', processed, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        processed_base64 = base64.b64encode(buffer).decode()
         
         return jsonify({
             'success': True,
@@ -91,6 +106,9 @@ def detect_faces():
         })
         
     except Exception as e:
+        import traceback
+        print(f"Error: {str(e)}")
+        print(traceback.format_exc())
         return jsonify({
             'success': False,
             'error': str(e)
