@@ -66,20 +66,47 @@ def detect_faces():
         blur_factor = int(data.get('blur_factor', 3))
         pixel_size = int(data.get('pixel_size', 16))
         
-        # Decode base64 image
-        if ',' in image_data:
-            image_bytes = base64.b64decode(image_data.split(',')[1])
-        else:
-            image_bytes = base64.b64decode(image_data)
-        
-        # Convert to numpy array directly (faster than PIL)
-        nparr = np.frombuffer(image_bytes, np.uint8)
-        img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-        
-        if img is None:
+        # Validate image data
+        if not image_data or len(image_data) < 100:
             return jsonify({
                 'success': False,
-                'error': 'Failed to decode image'
+                'error': 'Invalid or empty image data'
+            }), 400
+        
+        # Decode base64 image
+        try:
+            if ',' in image_data:
+                image_bytes = base64.b64decode(image_data.split(',')[1])
+            else:
+                image_bytes = base64.b64decode(image_data)
+            
+            if len(image_bytes) == 0:
+                return jsonify({
+                    'success': False,
+                    'error': 'Empty image buffer'
+                }), 400
+            
+            # Convert to numpy array directly (faster than PIL)
+            nparr = np.frombuffer(image_bytes, np.uint8)
+            
+            if len(nparr) == 0:
+                return jsonify({
+                    'success': False,
+                    'error': 'Empty numpy array'
+                }), 400
+            
+            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            
+            if img is None or img.size == 0:
+                return jsonify({
+                    'success': False,
+                    'error': 'Failed to decode image - invalid format'
+                }), 400
+                
+        except Exception as decode_error:
+            return jsonify({
+                'success': False,
+                'error': f'Decode error: {str(decode_error)}'
             }), 400
         
         # Resize for faster processing (optional - improves speed)
